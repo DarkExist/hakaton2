@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Электролиз 360 - Калькулятор сплавов</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚗️ АЛЮМИНИЕВЫЕ СПЛАВЫ 360</h1>
+            <p class="subtitle">Интерактивный калькулятор свойств алюминиевых сплавов</p>
+            <p class="description">
+                Рассчитайте механические и физические свойства алюминиевого сплава на основе его химического состава.
+                Укажите процентное содержание легирующих элементов и получите прогноз свойств сплава.
+            </p>
+            <div class="auth-section">
+                <div id="auth-buttons">
+                    <button id="login-btn" class="auth-button">Войти</button>
+                    <button id="register-btn" class="auth-button">Регистрация</button>
+                </div>
+                <div id="user-info" style="display: none;">
+                    <span id="username-display"></span>
+                    <button id="logout-btn" class="auth-button">Выйти</button>
+                    <button id="experiments-btn" class="auth-button">Мои эксперименты</button>
+                </div>
+            </div>
+        </header>
+        <div class="main-content">
+            <div class="card">
+                <h2 class="card-title">🧪 Состав сплава</h2>
+                <div class="controls-section">
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Алюминий (Al)</span>
+                            <span class="slider-value" id="al-value">90.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="700" max="998" value="900" class="slider" id="al-slider" step="1">
+                        </div>
+                        <p>Основа сплава. Минимум 70%, максимум 99.8%.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Магний (Mg)</span>
+                            <span class="slider-value" id="mg-value">0.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="100" value="0" class="slider" id="mg-slider" step="1">
+                        </div>
+                        <p>Упрочняющий элемент. Повышает прочность и сохраняет свариваемость.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Кремний (Si)</span>
+                            <span class="slider-value" id="si-value">0.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="150" value="0" class="slider" id="si-slider" step="1">
+                        </div>
+                        <p>Улучшает литейные свойства и износостойкость.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Медь (Cu)</span>
+                            <span class="slider-value" id="cu-value">0.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="100" value="0" class="slider" id="cu-slider" step="1">
+                        </div>
+                        <p>Значительно повышает прочность, но снижает коррозионную стойкость.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Цинк (Zn)</span>
+                            <span class="slider-value" id="zn-value">0.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="100" value="0" class="slider" id="zn-slider" step="1">
+                        </div>
+                        <p>Обеспечивает высокую прочность в сочетании с магнием.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Марганец (Mn)</span>
+                            <span class="slider-value" id="mn-value">0.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="20" value="0" class="slider" id="mn-slider" step="1">
+                        </div>
+                        <p>Улучшает коррозионную стойкость и измельчает зерно.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Титан (Ti)</span>
+                            <span class="slider-value" id="ti-value">0.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="5" value="0" class="slider" id="ti-slider" step="1">
+                        </div>
+                        <p>Измельчает зерно и повышает жаропрочность.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Железо (Fe)</span>
+                            <span class="slider-value" id="fe-value">0.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="10" value="0" class="slider" id="fe-slider" step="1">
+                        </div>
+                        <p>Примесь. Снижает пластичность и коррозионную стойкость.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Прочие примеси</span>
+                            <span class="slider-value" id="other-value">0.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="10" value="0" class="slider" id="other-slider" step="1">
+                        </div>
+                        <p>Другие элементы, не указанные выше.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span><strong>Сумма:</strong></span>
+                            <span class="slider-value" id="total-value" style="color: #38a169;">100.0 %</span>
+                        </div>
+                        <p>Сумма всех компонентов должна быть близка к 100%.</p>
+                    </div>
+                </div>
+                <div class="calculate-section">
+                    <button id="calculate-btn" class="save-button">Рассчитать свойства сплава</button>
+                    <button id="reset-btn" class="auth-button">Сбросить значения</button>
+                </div>
+                <div class="save-experiment-section" id="save-alloy-section" style="display: none;">
+                    <h3 class="card-title">💾 Сохранить результаты</h3>
+                    <div class="experiment-form">
+                        <input type="text" id="alloy-name" placeholder="Название сплава" required>
+                        <button id="save-alloy-btn" class="save-button">Сохранить сплав</button>
+                    </div>
+                    <p class="experiment-note">Сохраните результаты расчета для последующего просмотра</p>
+                </div>
+            </div>
+            <div class="card">
+                <h2 class="card-title">📊 Результаты расчета</h2>
+                <div class="results-container">
+                    <div id="results-placeholder" class="results-placeholder">
+                        <p>Настройте состав сплава и нажмите "Рассчитать свойства сплава"</p>
+                    </div>
+                    <div id="results-content" style="display: none;">
+                        <div class="results-grid">
+                            <div class="result-card">
+                                <div class="result-title">Предел прочности</div>
+                                <div class="result-value" id="tensile-strength-value">0</div>
+                                <div class="result-unit">МПа</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="result-title">Предел текучести</div>
+                                <div class="result-value" id="yield-strength-value">0</div>
+                                <div class="result-unit">МПа</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="result-title">Относительное удлинение</div>
+                                <div class="result-value" id="elongation-value">0</div>
+                                <div class="result-unit">%</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="result-title">Твердость</div>
+                                <div class="result-value" id="hardness-value">0</div>
+                                <div class="result-unit">HB</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="result-title">Плотность</div>
+                                <div class="result-value" id="density-value">0</div>
+                                <div class="result-unit">г/см³</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="result-title">Теплопроводность</div>
+                                <div class="result-value" id="thermal-conductivity-value">0</div>
+                                <div class="result-unit">Вт/(м·K)</div>
+                            </div>
+                        </div>
+                        <div class="properties-section">
+                            <h3 class="info-title">📋 Характеристики сплава</h3>
+                            <div class="properties-grid">
+                                <div class="property-item">
+                                    <span class="property-label">Серия сплава:</span>
+                                    <span class="property-value" id="alloy-series-value">-</span>
+                                </div>
+                                <div class="property-item">
+                                    <span class="property-label">Коррозионная стойкость:</span>
+                                    <span class="property-value" id="corrosion-resistance-value">-</span>
+                                </div>
+                                <div class="property-item">
+                                    <span class="property-label">Свариваемость:</span>
+                                    <span class="property-value" id="weldability-value">-</span>
+                                </div>
+                            </div>
+                            <div class="recommendations-section">
+                                <h3 class="info-title">🚀 Рекомендуемые применения</h3>
+                                <ul class="recommendations-list" id="recommendations-list">
+                                    <!-- Заполняется динамически -->
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="export-section">
+                            <button id="export-pdf-btn" class="auth-button">Экспорт в PDF</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="charts-container">
+            <div class="card">
+                <h2 class="card-title">📈 Сравнение со стандартными сплавами</h2>
+                <div class="chart-wrapper">
+                    <canvas id="alloy-comparison-chart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2 class="card-title">🔬 Влияние элементов</h2>
+                <div class="chart-wrapper">
+                    <canvas id="elements-impact-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="info-card card">
+            <h2 class="card-title">📚 Справочная информация</h2>
+            <div class="info-content">
+                <h3 class="info-title">Система обозначений алюминиевых сплавов</h3>
+                <table class="reference-table">
+                    <tr>
+                        <th>Серия</th>
+                        <th>Система</th>
+                        <th>Основные легирующие элементы</th>
+                        <th>Примеры сплавов</th>
+                    </tr>
+                    <tr>
+                        <td>1xxx</td>
+                        <td>Технически чистый алюминий</td>
+                        <td>Al > 99%</td>
+                        <td>АД0, 1050, 1100</td>
+                    </tr>
+                    <tr>
+                        <td>2xxx</td>
+                        <td>Al-Cu</td>
+                        <td>Медь</td>
+                        <td>Д1, 2024, 2014</td>
+                    </tr>
+                    <tr>
+                        <td>3xxx</td>
+                        <td>Al-Mn</td>
+                        <td>Марганец</td>
+                        <td>АМц, 3003, 3004</td>
+                    </tr>
+                    <tr>
+                        <td>4xxx</td>
+                        <td>Al-Si</td>
+                        <td>Кремний</td>
+                        <td>АК5, 4043, 4032</td>
+                    </tr>
+                    <tr>
+                        <td>5xxx</td>
+                        <td>Al-Mg</td>
+                        <td>Магний</td>
+                        <td>АМг5, 5052, 5083</td>
+                    </tr>
+                    <tr>
+                        <td>6xxx</td>
+                        <td>Al-Mg-Si</td>
+                        <td>Магний + Кремний</td>
+                        <td>АД31, 6061, 6063</td>
+                    </tr>
+                    <tr>
+                        <td>7xxx</td>
+                        <td>Al-Zn-Mg-Cu</td>
+                        <td>Цинк + Магний + Медь</td>
+                        <td>В95, 7075, 7050</td>
+                    </tr>
+                </table>
+                <h3 class="info-title">Влияние легирующих элементов</h3>
+                <div class="elements-impact">
+                    <div class="element-item">
+                        <span class="element-name">Магний (Mg)</span>
+                        <span class="element-effect">↑ Прочность, ↑ Коррозионная стойкость, ↔ Свариваемость</span>
+                    </div>
+                    <div class="element-item">
+                        <span class="element-name">Кремний (Si)</span>
+                        <span class="element-effect">↓ Температура плавления, ↑ Литейные свойства, ↑ Износостойкость</span>
+                    </div>
+                    <div class="element-item">
+                        <span class="element-name">Медь (Cu)</span>
+                        <span class="element-effect">↑↑ Прочность, ↑ Обрабатываемость, ↓↓ Коррозионная стойкость</span>
+                    </div>
+                    <div class="element-item">
+                        <span class="element-name">Цинк (Zn)</span>
+                        <span class="element-effect">↑↑ Прочность (в сочетании с Mg), ↓ Коррозионная стойкость</span>
+                    </div>
+                    <div class="element-item">
+                        <span class="element-name">Марганец (Mn)</span>
+                        <span class="element-effect">↑ Прочность, ↑ Коррозионная стойкость, ↓ Размер зерна</span>
+                    </div>
+                    <div class="element-item">
+                        <span class="element-name">Титан (Ti)</span>
+                        <span class="element-effect">↓ Размер зерна, ↑ Механические свойства, ↑ Жаропрочность</span>
+                    </div>
+                    <div class="element-item">
+                        <span class="element-name">Железо (Fe)</span>
+                        <span class="element-effect">↓ Пластичность, ↓ Коррозионная стойкость (примесь)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="footer">
+            <p>Калькулятор сплавов "Алюминиевые сплавы 360" | Хакатон по кейсу 2 | Разработано на основе технического задания</p>
+            <p>Расчеты основаны на эмпирических формулах и могут отличаться от реальных значений. Для промышленного применения необходимы лабораторные испытания.</p>
+        </div>
+    </div>
+    <!-- Модальные окна -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Вход в систему</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-username">Имя пользователя:</label>
+                    <input type="text" id="login-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Пароль:</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button type="submit" class="submit-button">Войти</button>
+                <p class="switch-form">Нет аккаунта? <a href="#" id="switch-to-register">Зарегистрироваться</a></p>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="register-modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Регистрация</h2>
+            <form id="register-form">
+                <div class="form-group">
+                    <label for="register-username">Имя пользователя:</label>
+                    <input type="text" id="register-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Пароль:</label>
+                    <input type="password" id="register-password" required>
+                </div>
+                <button type="submit" class="submit-button">Зарегистрироваться</button>
+                <p class="switch-form">Уже есть аккаунт? <a href="#" id="switch-to-login">Войти</a></p>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="alloy-details-modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="alloy-details-title">Детали сплава</h2>
+            <div id="alloy-details-content">
+                <!-- Динамически заполняется -->
+            </div>
+        </div>
+    </div>
+    <div class="warning-message warning-danger" id="danger-warning">Ошибка в расчете: сумма компонентов должна быть 100%</div>
+    <div class="warning-message warning-warning" id="warning-warning">Предупреждение: сумма компонентов не равна 100%. Результаты могут быть неточными.</div>
+    <div class="warning-message warning-success" id="success-warning">Расчет успешно выполнен!</div>
+    <script src="static/js/alloy_calculator.js"></script>
+</body>
+</html>

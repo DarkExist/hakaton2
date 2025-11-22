@@ -7,7 +7,7 @@ from features.experiments.schemas import SaveExperimentHistoryRequest, Experimen
 
 def save_experiment_history(
     db: Session,
-    user_id: int,  # Теперь ожидаем именно int
+    user_id: int,  
     history_request: SaveExperimentHistoryRequest
 ):
     if not history_request.experiments:

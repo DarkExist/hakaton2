@@ -79,3 +79,6 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "service": "Электролиз 360 API"
     }
+@app.get("/alloy-calculator")
+async def get_alloy_calculator_page(request: Request):
+    return templates.TemplateResponse("alloy_calculator.html", {"request": request})

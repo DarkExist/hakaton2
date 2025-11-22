@@ -1,10 +1,14 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from datetime import datetime
 from features.alloy_calculator.schemas import (
     AlloyComposition, 
     AlloyResponse
 )
+from fastapi import Depends
 from features.alloy_calculator.calculator import calculate_alloy_properties
-
+from app.dependencies import get_current_active_user 
+from features.auth.models import User
 router = APIRouter()
 
 @router.post("/alloy-calculator", response_model=AlloyResponse)
@@ -36,6 +40,55 @@ async def alloy_calculator(composition: AlloyComposition):
         raise HTTPException(
             status_code=400,
             detail=f"Ошибка при расчете свойств сплава: {str(e)}"
+        )
+
+@router.post("/alloy-calculator/export-pdf")
+async def export_alloy_to_pdf(
+    export_data: dict,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Экспортирует результаты расчета сплава в PDF
+    
+    Args:
+        export_data: Данные для экспорта в формате:
+            {
+                "alloy_name": "Название сплава",
+                "composition": {"al": 90.0, "mg": 1.0, ...},
+                "properties": {"tensile_strength": 250.0, ...}
+            }
+    
+    Returns:
+        StreamingResponse: PDF-файл для скачивания
+    """
+    try:
+        from features.alloy_calculator.pdf_generator import generate_alloy_pdf
+        
+        alloy_name = export_data.get("alloy_name", "Безымянный сплав")
+        composition = export_data.get("composition", {})
+        properties = export_data.get("properties", {})
+        
+        # Генерация PDF
+        pdf_bytes = generate_alloy_pdf(alloy_name, composition, properties)
+        
+        # Формирование имени файла
+        safe_name = "".join(c for c in alloy_name if c.isalnum() or c in (" ", "_", "-")).rstrip()
+        filename = f"alloy_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
+        # Возврат PDF как потокового ответа
+        return StreamingResponse(
+            iter([pdf_bytes]),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(pdf_bytes))
+            }
+        )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при генерации PDF: {str(e)}"
         )
 
 @router.get("/alloy-info")
