@@ -5,7 +5,8 @@ from features.simulation.schemas import ProcessParameters, ProcessResults
 from features.simulation.calculator import (
     calculate_eta,
     calculate_energy_consumption,
-    calculate_anode_consumption
+    calculate_anode_consumption,
+    calculate_productivity  # ДОБАВЛЕНО: импорт новой функции
 )
 
 router = APIRouter()
@@ -39,7 +40,6 @@ async def simulate_process(params: ProcessParameters):
     
     warning_message = ""
     
-    # Добавлено предупреждение для напряжения ниже 4.0В
     if params.voltage < 4.0:
         warning_message = "Напряжение ниже 4.0В нестабильно! Возможны колебания процесса."
     
@@ -51,6 +51,7 @@ async def simulate_process(params: ProcessParameters):
     
     energy = calculate_energy_consumption(params.voltage, eta)
     anode = calculate_anode_consumption(eta)
+    productivity = calculate_productivity(params.current, eta)  # ДОБАВЛЕНО: расчет производительности
     
     if not warning_message and (
         eta < 85 or 
@@ -63,6 +64,7 @@ async def simulate_process(params: ProcessParameters):
         eta=eta,
         energy_consumption=energy,
         anode_consumption=anode,
+        productivity=productivity, 
         critical_failure=eta_result["critical_failure"],
         warning_message=warning_message,
         timestamp=datetime.now().isoformat()

@@ -11,6 +11,7 @@ class ProcessParameters(BaseModel):
 class ProcessResults(BaseModel):
     eta: float            # Выход по току в %
     energy_consumption: int  # Удельный расход энергии в кВт·ч/т Al
+    productivity: float
     anode_consumption: int   # Расход анодного материала в кг/т Al
     critical_failure: bool   # Флаг критического сбоя
     warning_message: str     # Сообщение предупреждения
