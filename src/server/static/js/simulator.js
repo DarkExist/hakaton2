@@ -393,19 +393,20 @@ async function saveExperimentHistory() {
     saveButton.textContent = 'Сохранение...';
     
     const payload = {
-        experiment_name: experimentName,
-        experiments: experimentsHistory.map(exp => ({
-            timestamp: exp.timestamp,
-            parameters: exp.parameters,
-            results: {
-                eta: exp.results.eta,
-                energy_consumption: exp.results.energy_consumption,
-                anode_consumption: exp.results.anode_consumption,
-                critical_failure: exp.results.critical_failure,
-                warning_message: exp.results.warning_message
-            }
-        }))
-    };
+    experiment_name: experimentName,
+    experiments: experimentsHistory.map(exp => ({
+        timestamp: exp.timestamp,
+        parameters: exp.parameters,
+        results: {
+            eta: exp.results.eta,
+            energy_consumption: exp.results.energy_consumption,
+            anode_consumption: exp.results.anode_consumption,
+            critical_failure: exp.results.critical_failure,
+            warning_message: exp.results.warning_message,
+            timestamp: exp.timestamp  // Добавляем timestamp внутрь results
+        }
+    }))
+};
     
     const result = await apiRequest('/api/experiments/save', {
         method: 'POST',
