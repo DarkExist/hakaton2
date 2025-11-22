@@ -937,7 +937,7 @@ function initSimulator() {
     }, 300);
     
     // Периодическое обновление данных
-    setInterval(updateSimulation, 1000);
+    setInterval(updateSimulation, 5000);
 }
 
 // Запуск симулятора при загрузке страницы
