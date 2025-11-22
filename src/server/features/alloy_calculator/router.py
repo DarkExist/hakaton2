@@ -71,18 +71,25 @@ async def export_alloy_to_pdf(
         # Генерация PDF
         pdf_bytes = generate_alloy_pdf(alloy_name, composition, properties)
         
-        # Формирование имени файла
+        # Формирование имени файла (безопасное имя и RFC5987-encoded filename*)
         safe_name = "".join(c for c in alloy_name if c.isalnum() or c in (" ", "_", "-")).rstrip()
         filename = f"alloy_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        
+
+        # RFC5987 encode for UTF-8 filenames in Content-Disposition
+        from urllib.parse import quote
+        filename_star = "UTF-8''" + quote(filename)
+
+        headers = {
+            # provide both filename* (UTF-8) and an ASCII-fallback filename
+            'Content-Disposition': f"attachment; filename*= {filename_star}; filename=alloy.pdf",
+            'Content-Length': str(len(pdf_bytes))
+        }
+
         # Возврат PDF как потокового ответа
         return StreamingResponse(
             iter([pdf_bytes]),
             media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}",
-                "Content-Length": str(len(pdf_bytes))
-            }
+            headers=headers
         )
     
     except Exception as e:

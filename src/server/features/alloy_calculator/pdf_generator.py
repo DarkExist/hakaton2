@@ -1,3 +1,6 @@
+import reportlab.rl_config
+reportlab.rl_config.defaultEncoding = 'utf-8'
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -20,7 +23,7 @@ from typing import Dict, Any
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 FONTS_DIR = BASE_DIR / "static" / "fonts"
 
 # Регистрация шрифтов
@@ -49,49 +52,57 @@ def generate_alloy_pdf(alloy_name: str, composition: Dict[str, float], propertie
     
     # Стили
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(
-        name='Title',
-        fontName=BOLD_FONT,
-        fontSize=18,
-        alignment=1,
-        spaceAfter=30,
-        textColor=colors.HexColor("#2d3748")
-    ))
-    styles.add(ParagraphStyle(
-        name='Heading1',
+
+    # Helper to update existing style or add new one
+    def _set_style(name: str, **kw):
+        if name in styles:
+            s = styles[name]
+            for k, v in kw.items():
+                setattr(s, k, v)
+        else:
+            styles.add(ParagraphStyle(name=name, **kw))
+
+    _set_style(
+        'Normal',
+        fontName=DEFAULT_FONT,
+        fontSize=10,
+        leading=14
+    )
+    _set_style(
+        'Heading1',
         fontName=BOLD_FONT,
         fontSize=14,
         spaceAfter=12,
         textColor=colors.HexColor("#2d3748")
-    ))
-    styles.add(ParagraphStyle(
-        name='Heading2',
+    )
+    _set_style(
+        'Heading2',
         fontName=BOLD_FONT,
         fontSize=12,
         spaceAfter=8,
         spaceBefore=12,
         textColor=colors.HexColor("#2d3748")
-    ))
-    styles.add(ParagraphStyle(
-        name='CustomNormal',
+    )
+    _set_style(
+        'CustomNormal',
         fontName=DEFAULT_FONT,
         fontSize=10,
         spaceAfter=6,
         leading=14
-    ))
-    styles.add(ParagraphStyle(
-        name='CustomBold',
+    )
+    _set_style(
+        'CustomBold',
         fontName=BOLD_FONT,
         fontSize=10,
         spaceAfter=6
-    ))
-    styles.add(ParagraphStyle(
-        name='CustomSmall',
+    )
+    _set_style(
+        'CustomSmall',
         fontName=DEFAULT_FONT,
         fontSize=8,
         spaceAfter=4,
         leading=10
-    ))
+    )
     
     story = []
     
@@ -192,18 +203,18 @@ def generate_alloy_pdf(alloy_name: str, composition: Dict[str, float], propertie
     # Дополнительная информация
     story.append(Paragraph("Дополнительная информация", styles['Heading1']))
     
-    info_text = """
-    <para spaceAfter="12">Данный расчет основан на эмпирических формулах и математических моделях. 
-    Результаты носят прогнозный характер и могут отличаться от реальных значений.</para>
-    
-    <para spaceAfter="12"><b>Важные замечания:</b></para>
-    <para spaceAfter="6">• Для промышленного применения необходимы лабораторные испытания конкретного сплава.</para>
-    <para spaceAfter="6">• Термическая обработка значительно влияет на окончательные свойства сплава.</para>
-    <para spaceAfter="6">• Фактические свойства зависят от технологии производства и условий эксплуатации.</para>
-    <para spaceAfter="6">• Результаты расчета не являются основанием для принятия инженерных решений без дополнительной экспертизы.</para>
-    """
-    
-    story.append(Paragraph(info_text, styles['CustomNormal']))
+    info_paragraphs = [
+        "Данный расчет основан на эмпирических формулах и математических моделях. Результаты носят прогнозный характер и могут отличаться от реальных значений.",
+        "<b>Важные замечания:</b>",
+        "• Для промышленного применения необходимы лабораторные испытания конкретного сплава.",
+        "• Термическая обработка значительно влияет на окончательные свойства сплава.",
+        "• Фактические свойства зависят от технологии производства и условий эксплуатации.",
+        "• Результаты расчета не являются основанием для принятия инженерных решений без дополнительной экспертизы."
+    ]
+
+    for para in info_paragraphs:
+        # use CustomNormal for regular text and allow basic inline markup like <b>
+        story.append(Paragraph(para, styles['CustomNormal']))
     
     # Генерация PDF
     doc.build(story)

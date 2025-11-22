@@ -496,24 +496,24 @@ async function exportToPDF() {
             properties: properties
         };
         
-        // Отправляем запрос на генерацию PDF
-        const options = {
+        // Отправляем запрос для получения PDF напрямую через fetch, так как apiRequest ожидает JSON
+        // и не подходит для получения бинарных данных, таких как PDF.
+        const pdfResponse = await fetch('/api/alloy-calculator/export-pdf', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8',
+                'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify(exportData)
-        };
+        });
         
-        const response = await fetch('/api/alloy-calculator/export-pdf', options);
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || `Ошибка ${response.status}`);
+        if (!pdfResponse.ok) {
+            const errorData = await pdfResponse.json().catch(() => ({}));
+            throw new Error(errorData.detail || `Ошибка ${pdfResponse.status}`);
         }
         
         // Загружаем PDF
-        const blob = await response.blob();
+        const blob = await pdfResponse.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
