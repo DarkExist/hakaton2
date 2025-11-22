@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Электролиз 360 - Симулятор процесса</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ ЭЛЕКТРОЛИЗ 360 ⚡</h1>
+            <p class="subtitle">Интерактивный симулятор процесса Холла-Эру для производства алюминия</p>
+            <p class="description">
+                Управляйте параметрами электролизера в реальном времени и наблюдайте за влиянием на эффективность процесса. 
+                Настройте силу тока, напряжение, температуру и концентрацию глинозёма для достижения оптимальных показателей.
+            </p>
+        </header>
+        <div class="main-content">
+            <div class="card">
+                <h2 class="card-title">🎛️ Параметры управления</h2>
+                <div class="controls-section">
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Сила тока (I)</span>
+                            <span class="slider-value" id="current-value">300 кА</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="200" max="400" value="300" class="slider" id="current-slider">
+                        </div>
+                        <p>Диапазон: 200-400 кА. Определяет скорость производства алюминия.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Напряжение (U)</span>
+                            <span class="slider-value" id="voltage-value">4.2 В</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="40" max="45" value="42" class="slider" id="voltage-slider" step="1">
+                        </div>
+                        <p>Диапазон: 4.0-4.5 В. Влияет на удельный расход энергии.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Температура (T)</span>
+                            <span class="slider-value" id="temperature-value">960 °C</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="950" max="970" value="960" class="slider" id="temperature-slider">
+                        </div>
+                        <p>Диапазон: 950-970 °C. Критически влияет на выход по току.</p>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Концентрация глинозёма (C)</span>
+                            <span class="slider-value" id="concentration-value">4.0 %</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" min="20" max="60" value="40" class="slider" id="concentration-slider" step="1">
+                        </div>
+                        <p>Диапазон: 2-6 %. Недостаток вызывает анодный эффект.</p>
+                    </div>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-card" id="eta-card">
+                        <div class="metric-title"><span class="status-indicator status-green"></span>Выход по току (η)</div>
+                        <div class="metric-value" id="eta-value">90.0%</div>
+                        <div class="metric-unit">Оптимум: ≥90%</div>
+                    </div>
+                    <div class="metric-card" id="energy-card">
+                        <div class="metric-title"><span class="status-indicator status-green"></span>Удельный расход энергии</div>
+                        <div class="metric-value" id="energy-value">13900</div>
+                        <div class="metric-unit">кВт·ч/т Al</div>
+                    </div>
+                    <div class="metric-card" id="anode-card">
+                        <div class="metric-title"><span class="status-indicator status-green"></span>Расход анодного материала</div>
+                        <div class="metric-value" id="anode-value">334</div>
+                        <div class="metric-unit">кг/т Al</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h2 class="card-title">🧪 Визуализация процесса</h2>
+                <div class="simulator-container">
+                    <div class="electrolyzer">
+                        <div class="anode"></div>
+                        <div class="electrolyte" id="electrolyte"></div>
+                        <div class="aluminum-layer" id="aluminum-layer"></div>
+                        <div class="cathode"></div>
+                    </div>
+                    <div class="failure-overlay" id="failure-overlay">
+                        <div class="failure-text" id="failure-text">АНОДНЫЙ ЭФФЕКТ!</div>
+                        <div class="failure-text">СРОЧНО ПОДАТЬ ГЛИНОЗЁМ!</div>
+                    </div>
+                </div>
+                <div class="info-panel">
+                    <h3 class="info-title">🔍 О процессе</h3>
+                    <div class="info-content">
+                        <p><strong>Процесс Холла-Эру:</strong> Электролиз расплавленного глинозёма (Al₂O₃) в криолите (Na₃AlF₆).</p>
+                        <p><strong>Катод:</strong> Al³⁺ + 3e⁻ → Al(ж) | <strong>Анод:</strong> C + O²⁻ → CO₂ + 2e⁻</p>
+                        <p><strong>Общая реакция:</strong> 2Al₂O₃ + 3C → 4Al + 3CO₂</p>
+                        <p><strong>Ключевые формулы:</strong></p>
+                        <p>η = η₀ + Δηₜ + Δη꜀ | <span class="formula">E_уд = (U × 1000) / (g_Al × (η/100))</span> | <span class="formula">Расход_анода = 334 / (η/100)</span></p>
+                    </div>
+                    <div class="reference-links">
+                        <a href="https://www.youtube.com/watch?v=IN0NlyvqZE0" target="_blank" class="reference-link">Видео: Галилео. Алюминий</a>
+                        <a href="https://www.youtube.com/watch?v=7WPunCfjJ6I" target="_blank" class="reference-link">Видео: Принцип электролиза</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="charts-container">
+            <div class="card">
+                <h2 class="card-title">📊 Динамика показателей</h2>
+                <div class="chart-wrapper">
+                    <canvas id="metrics-chart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2 class="card-title">📈 Влияние параметров</h2>
+                <div class="chart-wrapper">
+                    <canvas id="parameters-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="footer">
+            <p>Симулятор "Электролиз 360" | Хакатон по кейсу 2 | Разработано на основе технического задания</p>
+            <p>Все расчеты основаны на реальных промышленных данных и формулах процесса Холла-Эру</p>
+        </div>
+    </div>
+    <div class="warning-message warning-danger" id="danger-warning">Опасность короткого замыкания!</div>
+    <div class="warning-message warning-warning" id="warning-warning">Внимание: отклонение от оптимальных параметров</div>
+    
+    <script src="/static/js/simulator.js"></script>
+</body>
+</html>
