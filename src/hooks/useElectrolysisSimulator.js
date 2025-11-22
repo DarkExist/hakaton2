@@ -2,12 +2,30 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export const useElectrolysisSimulator = () => {
-  const [current, setCurrent] = useState(160); // кА
-  const [temperature, setTemperature] = useState(960); // °C
+  // Основные параметры согласно справочнику
+  const [current, setCurrent] = useState(300); // кА (диапазон 200-400 кА)
+  const [voltage, setVoltage] = useState(4.2); // В (диапазон 4.0-4.5 В)
+  const [temperature, setTemperature] = useState(960); // °C (диапазон 950-970 °C)
+  const [aluminaConcentration, setAluminaConcentration] = useState(4.0); // % (диапазон 2-6%)
+  
+  // Дополнительные параметры для расширенного функционала
   const [metalLevel, setMetalLevel] = useState(20); // см
   const [alf3, setAlf3] = useState(12); // %
   const [caf2, setCaf2] = useState(6); // %
+  
   const [isEmergency, setIsEmergency] = useState(false);
+  const [emergencyType, setEmergencyType] = useState('');
+  
+  // "Ручка" для будущих анимаций
+  const [animationTriggers, setAnimationTriggers] = useState({
+    ionMovement: false,
+    gasBubbles: false,
+    metalAccumulation: false,
+    anodeEffect: false,
+    electrolyteFreezing: false,
+    shortCircuit: false
+  });
+  
   const [journal, setJournal] = useState(() => {
     const saved = localStorage.getItem('electrolysisJournal');
     return saved ? JSON.parse(saved) : [];
@@ -18,79 +36,123 @@ export const useElectrolysisSimulator = () => {
     localStorage.setItem('electrolysisJournal', JSON.stringify(journal));
   }, [journal]);
 
-  // Расчет выхода по току
-  const calculateCurrentEfficiency = useCallback(() => {
-    if (isEmergency) return 0;
-    
-    let efficiency = 92;
-    // Влияние силы тока
-    if (current < 140) efficiency -= (140 - current) * 0.3;
-    if (current > 180) efficiency -= (current - 180) * 0.4;
-    // Влияние температуры
-    if (temperature < 940) efficiency -= (940 - temperature) * 0.15;
-    if (temperature > 980) efficiency -= (temperature - 980) * 0.2;
-    // Влияние уровня металла
-    if (metalLevel < 18) efficiency -= (18 - metalLevel) * 0.5;
-    if (metalLevel > 25) efficiency -= (metalLevel - 25) * 0.3;
-    // Влияние состава электролита
-    if (alf3 < 10 || alf3 > 14) efficiency -= 2;
-    if (caf2 < 5 || caf2 > 7) efficiency -= 1;
-    
-    return Math.max(70, Math.min(95, efficiency));
-  }, [current, temperature, metalLevel, alf3, caf2, isEmergency]);
+  // Константа для расчетов - электрохимический эквивалент алюминия (г/А*ч)
+  const g_Al = 0.3356;
 
-  // Расчет расхода энергии
+  // Расчет выхода по току согласно справочнику
+  const calculateCurrentEfficiency = useCallback(() => {
+    if (isEmergency) {
+      if (emergencyType === 'anodeEffect') return 60;
+      if (emergencyType === 'electrolyteFreezing') return 70;
+      if (emergencyType === 'shortCircuit') return 50;
+    }
+    
+    let baseEfficiency = 90; // Базовое значение Eta_0
+    
+    // Поправка от температуры (Delta_Eta_T)
+    let tempCorrection = 0;
+    if (temperature === 960) {
+      tempCorrection = 0;
+    } else if (temperature > 960) {
+      tempCorrection = -0.5 * (temperature - 960);
+    } else if (temperature > 950 && temperature < 960) {
+      tempCorrection = -0.3 * (960 - temperature);
+    } else if (temperature <= 950) {
+      // Критическое охлаждение
+      setIsEmergency(true);
+      setEmergencyType('electrolyteFreezing');
+      tempCorrection = -20; // Условное значение для падения до 70%
+    }
+    
+    // Поправка от концентрации глинозёма (Delta_Eta_C)
+    let aluminaCorrection = 0;
+    if (aluminaConcentration >= 3.5 && aluminaConcentration <= 4.5) {
+      aluminaCorrection = 0;
+    } else if (aluminaConcentration >= 3.0 && aluminaConcentration < 3.5) {
+      aluminaCorrection = -0.5 * (3.5 - aluminaConcentration);
+    } else if (aluminaConcentration < 3.0) {
+      // Критический недостаток - Анодный Эффект
+      setIsEmergency(true);
+      setEmergencyType('anodeEffect');
+      aluminaCorrection = -30; // Условное значение для падения до 60%
+    }
+    
+    let efficiency = baseEfficiency + tempCorrection + aluminaCorrection;
+    return Math.max(70, Math.min(95, efficiency));
+  }, [temperature, aluminaConcentration, isEmergency, emergencyType]);
+
+  // Расчет удельного расхода электроэнергии согласно справочнику
   const calculateEnergyConsumption = useCallback(() => {
-    if (isEmergency) return 25.0;
-    
-    let consumption = 13.5;
-    // Влияние силы тока
-    consumption += (current - 160) * 0.02;
-    // Влияние температуры
-    consumption += (temperature - 960) * 0.01;
-    // Влияние уровня металла
-    if (metalLevel < 18) consumption += (18 - metalLevel) * 0.1;
-    if (metalLevel > 25) consumption += (metalLevel - 25) * 0.05;
-    // Влияние состава электролита
-    if (alf3 < 10 || alf3 > 14) consumption += 0.3;
-    if (caf2 < 5 || caf2 > 7) consumption += 0.2;
-    // Влияние выхода по току
     const efficiency = calculateCurrentEfficiency();
-    consumption *= (92 / efficiency);
     
-    return Math.max(12.0, Math.min(18.0, parseFloat(consumption.toFixed(2))));
-  }, [current, temperature, metalLevel, alf3, caf2, calculateCurrentEfficiency, isEmergency]);
+    // Проверка на короткое замыкание
+    if (voltage < 4.0) {
+      setIsEmergency(true);
+      setEmergencyType('shortCircuit');
+    } else if (emergencyType === 'shortCircuit' && voltage >= 4.0) {
+      setIsEmergency(false);
+      setEmergencyType('');
+    }
+    
+    // Формула: E_уд = (U * 1000) / (g_Al * (Eta / 100))
+    const consumption = (voltage * 1000) / (g_Al * (efficiency / 100));
+    return parseFloat(consumption.toFixed(2));
+  }, [voltage, calculateCurrentEfficiency, isEmergency, emergencyType]);
+
+  // Расчет расхода анодного материала
+  const calculateAnodeConsumption = useCallback(() => {
+    const efficiency = calculateCurrentEfficiency();
+    // Формула: Расход_Анода = 334 / (Eta / 100)
+    return parseFloat((334 / (efficiency / 100)).toFixed(2));
+  }, [calculateCurrentEfficiency]);
 
   // Проверка аварийных условий
   const checkEmergencyConditions = useCallback(() => {
+    const efficiency = calculateCurrentEfficiency();
+    let status = 'Норма';
     let warning = false;
     let danger = false;
     
-    // Предупреждающие условия
-    if (current < 130 || current > 190 ||
-        temperature < 920 || temperature > 990 ||
-        metalLevel < 16 || metalLevel > 28 ||
-        alf3 < 8 || alf3 > 15 ||
-        caf2 < 4 || caf2 > 8) {
-      warning = true;
-    }
-    
-    // Аварийные условия
-    if (current < 125 || current > 195 ||
-        temperature < 910 || temperature > 995 ||
-        metalLevel < 15 || metalLevel > 30 ||
-        alf3 < 7 || alf3 > 16 ||
-        caf2 < 3 || caf2 > 9) {
-      danger = true;
-      setIsEmergency(true);
+    if (isEmergency) {
+      if (emergencyType === 'anodeEffect') {
+        status = 'Анодный Эффект';
+        danger = true;
+        // Активация анимации для будущей реализации
+        setAnimationTriggers(prev => ({ ...prev, anodeEffect: true }));
+      } else if (emergencyType === 'electrolyteFreezing') {
+        status = 'Опасность застывания';
+        danger = true;
+        // Активация анимации для будущей реализации
+        setAnimationTriggers(prev => ({ ...prev, electrolyteFreezing: true }));
+      } else if (emergencyType === 'shortCircuit') {
+        status = 'Короткое замыкание';
+        danger = true;
+        // Активация анимации для будущей реализации
+        setAnimationTriggers(prev => ({ ...prev, shortCircuit: true }));
+      }
     } else {
-      setIsEmergency(false);
+      // Сброс анимаций при нормализации
+      if (animationTriggers.anodeEffect || animationTriggers.electrolyteFreezing || animationTriggers.shortCircuit) {
+        setAnimationTriggers({
+          ionMovement: false,
+          gasBubbles: false,
+          metalAccumulation: false,
+          anodeEffect: false,
+          electrolyteFreezing: false,
+          shortCircuit: false
+        });
+      }
+      
+      if (efficiency < 85) {
+        status = 'Предупреждение';
+        warning = true;
+      }
     }
     
-    return { warning, danger };
-  }, [current, temperature, metalLevel, alf3, caf2]);
+    return { status, warning, danger };
+  }, [isEmergency, emergencyType, calculateCurrentEfficiency, animationTriggers]);
 
-  // Расчет свойств сплава
+  // Расчет свойств сплава (без изменений)
   const calculateAlloyProperties = useCallback((al, mg, si) => {
     const tensileStrength = 180 + mg * 15 + si * 5 - (100 - al) * 0.5;
     const ductility = 25 - mg * 1.5 - si * 0.8;
@@ -115,73 +177,52 @@ export const useElectrolysisSimulator = () => {
   const generateCurrentEfficiencyData = useCallback((centerValue) => {
     const data = [];
     const labels = [];
-    const step = 5;
+    const step = 10;
     
-    for (let i = -25; i <= 25; i += step) {
+    for (let i = -100; i <= 100; i += step) {
       const testCurrent = centerValue + i;
-      if (testCurrent >= 120 && testCurrent <= 200) {
-        let efficiency = 92;
-        // Влияние силы тока
-        if (testCurrent < 140) efficiency -= (140 - testCurrent) * 0.3;
-        if (testCurrent > 180) efficiency -= (testCurrent - 180) * 0.4;
-        // Влияние температуры (текущее значение)
-        if (temperature < 940) efficiency -= (940 - temperature) * 0.15;
-        if (temperature > 980) efficiency -= (temperature - 980) * 0.2;
-        // Влияние уровня металла (текущее значение)
-        if (metalLevel < 18) efficiency -= (18 - metalLevel) * 0.5;
-        if (metalLevel > 25) efficiency -= (metalLevel - 25) * 0.3;
-        // Влияние состава электролита (текущие значения)
-        if (alf3 < 10 || alf3 > 14) efficiency -= 2;
-        if (caf2 < 5 || caf2 > 7) efficiency -= 1;
+      if (testCurrent >= 200 && testCurrent <= 400) {
+        // Сохраняем текущие значения параметров
+        const originalTemp = temperature;
+        const originalAlumina = aluminaConcentration;
         
-        data.push(Math.max(70, Math.min(95, efficiency)));
+        // Временно устанавливаем тестовые значения для расчета
+        // (в реальном приложении здесь потребуется перерасчет с учетом всех зависимостей)
+        
+        let efficiency = 90;
+        // Простая линейная зависимость для демонстрации
+        efficiency += (testCurrent - 300) * 0.02;
+        
+        // Границы эффективности
+        efficiency = Math.max(70, Math.min(95, efficiency));
+        
+        data.push(efficiency);
         labels.push(`${testCurrent}`);
       }
     }
     
     return { labels, data };
-  }, [temperature, metalLevel, alf3, caf2]);
+  }, [temperature, aluminaConcentration]);
 
   const generateEnergyConsumptionData = useCallback((centerValue) => {
     const data = [];
     const labels = [];
-    const step = 5;
+    const step = 0.1;
     
-    for (let i = -25; i <= 25; i += step) {
-      const testTemp = centerValue + i;
-      if (testTemp >= 900 && testTemp <= 1000) {
-        let consumption = 13.5;
-        // Влияние температуры (тестовое значение)
-        consumption += (testTemp - 960) * 0.01;
-        // Влияние силы тока (текущее значение)
-        consumption += (current - 160) * 0.02;
-        // Влияние уровня металла (текущее значение)
-        if (metalLevel < 18) consumption += (18 - metalLevel) * 0.1;
-        if (metalLevel > 25) consumption += (metalLevel - 25) * 0.05;
-        // Влияние состава электролита (текущие значения)
-        if (alf3 < 10 || alf3 > 14) consumption += 0.3;
-        if (caf2 < 5 || caf2 > 7) consumption += 0.2;
-        // Влияние выхода по току
-        let efficiency = 92;
-        // Расчет эффективности с учетом всех параметров
-        if (current < 140) efficiency -= (140 - current) * 0.3;
-        if (current > 180) efficiency -= (current - 180) * 0.4;
-        if (testTemp < 940) efficiency -= (940 - testTemp) * 0.15;
-        if (testTemp > 980) efficiency -= (testTemp - 980) * 0.2;
-        if (metalLevel < 18) efficiency -= (18 - metalLevel) * 0.5;
-        if (metalLevel > 25) efficiency -= (metalLevel - 25) * 0.3;
-        if (alf3 < 10 || alf3 > 14) efficiency -= 2;
-        if (caf2 < 5 || caf2 > 7) efficiency -= 1;
-        efficiency = Math.max(70, Math.min(95, efficiency));
-        consumption *= (92 / efficiency);
+    for (let i = -0.5; i <= 0.5; i += step) {
+      const testVoltage = centerValue + i;
+      if (testVoltage >= 4.0 && testVoltage <= 4.5) {
+        // Используем текущую эффективность для расчета
+        const efficiency = calculateCurrentEfficiency();
+        const consumption = (testVoltage * 1000) / (g_Al * (efficiency / 100));
         
-        data.push(Math.max(12.0, Math.min(18.0, parseFloat(consumption.toFixed(2)))));
-        labels.push(`${testTemp}`);
+        data.push(parseFloat(consumption.toFixed(2)));
+        labels.push(`${testVoltage.toFixed(1)}`);
       }
     }
     
     return { labels, data };
-  }, [current, metalLevel, alf3, caf2]);
+  }, [calculateCurrentEfficiency]);
 
   const generateTemperatureData = useCallback(() => {
     const data = [];
@@ -192,7 +233,7 @@ export const useElectrolysisSimulator = () => {
       const time = new Date(now.getTime() - i * 60 * 60 * 1000);
       labels.push(time.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
       const baseTemp = temperature;
-      const variation = Math.sin(i * 0.5) * 3;
+      const variation = Math.sin(i * 0.5) * 2;
       data.push(baseTemp + variation);
     }
     
@@ -204,35 +245,40 @@ export const useElectrolysisSimulator = () => {
     if (journal.length === 0) {
       return {
         avgEfficiency: '0%',
-        avgConsumption: '0 кВт·ч/кг',
+        avgConsumption: '0 кВт·ч/т',
+        avgAnodeConsumption: '0 кг/т',
         experimentCount: '0'
       };
     }
     
     const avgEfficiency = journal.reduce((sum, entry) => sum + parseFloat(entry.efficiency), 0) / journal.length;
     const avgConsumption = journal.reduce((sum, entry) => sum + parseFloat(entry.consumption), 0) / journal.length;
+    const avgAnodeConsumption = journal.reduce((sum, entry) => sum + parseFloat(entry.anodeConsumption), 0) / journal.length;
     
     return {
       avgEfficiency: `${avgEfficiency.toFixed(1)}%`,
-      avgConsumption: `${avgConsumption.toFixed(1)} кВт·ч/кг`,
+      avgConsumption: `${avgConsumption.toFixed(1)} кВт·ч/т`,
+      avgAnodeConsumption: `${avgAnodeConsumption.toFixed(1)} кг/т`,
       experimentCount: journal.length.toString()
     };
   }, [journal]);
 
   // Добавление записи в журнал
   const addToJournal = useCallback(() => {
-    const { warning, danger } = checkEmergencyConditions();
-    const status = danger ? 'Авария' : (warning ? 'Предупреждение' : 'Норма');
+    const efficiency = calculateCurrentEfficiency();
+    const consumption = calculateEnergyConsumption();
+    const anodeConsumption = calculateAnodeConsumption();
+    const { status, warning, danger } = checkEmergencyConditions();
     
     const newEntry = {
       timestamp: new Date().toLocaleString('ru-RU'),
       current,
+      voltage,
       temperature,
-      metalLevel,
-      alf3,
-      caf2,
-      efficiency: calculateCurrentEfficiency().toFixed(1),
-      consumption: calculateEnergyConsumption().toFixed(2),
+      aluminaConcentration,
+      efficiency: efficiency.toFixed(1),
+      consumption: consumption.toFixed(1),
+      anodeConsumption: anodeConsumption.toFixed(1),
       status
     };
     
@@ -241,29 +287,40 @@ export const useElectrolysisSimulator = () => {
       return updated.slice(0, 50); // Ограничиваем 50 записями
     });
     
-    return { success: true, message: 'Симуляция выполнена. Результаты обновлены.' };
-  }, [current, temperature, metalLevel, alf3, caf2, calculateCurrentEfficiency, calculateEnergyConsumption, checkEmergencyConditions]);
+    return { 
+      success: true, 
+      message: danger ? 'Критическая ситуация зафиксирована!' : 'Симуляция выполнена успешно.',
+      emergency: danger
+    };
+  }, [
+    current, voltage, temperature, aluminaConcentration,
+    calculateCurrentEfficiency, calculateEnergyConsumption, calculateAnodeConsumption,
+    checkEmergencyConditions
+  ]);
 
   // Сброс параметров
   const resetParameters = useCallback(() => {
-    setCurrent(160);
+    setCurrent(300);
+    setVoltage(4.2);
     setTemperature(960);
+    setAluminaConcentration(4.0);
     setMetalLevel(20);
     setAlf3(12);
     setCaf2(6);
     setIsEmergency(false);
-    return { success: true, message: 'Параметры успешно сброшены.' };
+    setEmergencyType('');
+    return { success: true, message: 'Параметры успешно сброшены в оптимальные значения.' };
   }, []);
 
   // Аварийная остановка
   const emergencyStop = useCallback(() => {
-    setCurrent(150);
-    setTemperature(950);
-    setMetalLevel(18);
-    setAlf3(12);
-    setCaf2(6);
+    setCurrent(250);
+    setVoltage(4.2);
+    setTemperature(955);
+    setAluminaConcentration(4.5);
     setIsEmergency(false);
-    return { success: true, message: 'Аварийная ситуация устранена. Параметры возвращены в норму.' };
+    setEmergencyType('');
+    return { success: true, message: 'Аварийная ситуация устранена. Параметры возвращены в безопасные значения.' };
   }, []);
 
   // Очистка журнала
@@ -277,15 +334,28 @@ export const useElectrolysisSimulator = () => {
 
   const highlightElement = useCallback((elementType) => {
     setHighlightedElement(elementType);
-    setTimeout(() => setHighlightedElement(null), 5000);
+    setTimeout(() => setHighlightedElement(null), 3000);
+    
+    // Активация соответствующей анимации для будущей реализации
+    if (elementType === 'anode') {
+      setAnimationTriggers(prev => ({ ...prev, gasBubbles: true }));
+    } else if (elementType === 'cathode') {
+      setAnimationTriggers(prev => ({ ...prev, metalAccumulation: true }));
+    } else if (elementType === 'electrolyte') {
+      setAnimationTriggers(prev => ({ ...prev, ionMovement: true }));
+    }
   }, []);
 
   // Экспорт всех необходимых данных и функций
   return {
     current,
     setCurrent,
+    voltage,
+    setVoltage,
     temperature,
     setTemperature,
+    aluminaConcentration,
+    setAluminaConcentration,
     metalLevel,
     setMetalLevel,
     alf3,
@@ -293,9 +363,12 @@ export const useElectrolysisSimulator = () => {
     caf2,
     setCaf2,
     isEmergency,
+    emergencyType,
+    animationTriggers, // "Ручка" для будущих анимаций
     journal,
     calculateCurrentEfficiency,
     calculateEnergyConsumption,
+    calculateAnodeConsumption,
     checkEmergencyConditions,
     addToJournal,
     resetParameters,
