@@ -6,6 +6,7 @@ const history = {
     eta: [],
     energy: [],
     anode: [],
+    productivity: [], // ДОБАВЛЕНО: история производительности
     temperature: [],
     concentration: []
 };
@@ -67,7 +68,7 @@ async function simulateProcess(params) {
 }
 
 // Функция обновления состояния индикаторов
-function updateStatusIndicators(eta, voltage, temperature, concentration) {
+function updateStatusIndicators(eta, voltage, temperature, concentration, productivity) {
     // Определение цвета для выхода по току
     const etaIndicator = document.getElementById('eta-card').querySelector('.status-indicator');
     if (eta >= 90) {
@@ -98,6 +99,16 @@ function updateStatusIndicators(eta, voltage, temperature, concentration) {
         anodeIndicator.className = 'status-indicator status-yellow';
     } else {
         anodeIndicator.className = 'status-indicator status-red';
+    }
+    
+    // Определение цвета для производительности (ДОБАВЛЕНО)
+    const productivityIndicator = document.getElementById('productivity-card').querySelector('.status-indicator');
+    if (productivity >= 2.5) {
+        productivityIndicator.className = 'status-indicator status-green';
+    } else if (productivity >= 2.0) {
+        productivityIndicator.className = 'status-indicator status-yellow';
+    } else {
+        productivityIndicator.className = 'status-indicator status-red';
     }
     
     // Обновление цвета электролита в зависимости от температуры
@@ -255,7 +266,7 @@ function createBubble() {
 }
 
 // Функция обновления графиков
-function updateCharts(eta, energy, anode, temperature, concentration) {
+function updateCharts(eta, energy, anode, productivity, temperature, concentration) {
     const now = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     
     // Обновляем историю данных
@@ -263,6 +274,7 @@ function updateCharts(eta, energy, anode, temperature, concentration) {
     history.eta.push(eta);
     history.energy.push(energy);
     history.anode.push(anode);
+    history.productivity.push(productivity); // ДОБАВЛЕНО: сохранение производительности
     history.temperature.push(temperature);
     history.concentration.push(concentration);
     
@@ -272,6 +284,7 @@ function updateCharts(eta, energy, anode, temperature, concentration) {
         history.eta.shift();
         history.energy.shift();
         history.anode.shift();
+        history.productivity.shift(); // ДОБАВЛЕНО: сдвиг истории производительности
         history.temperature.shift();
         history.concentration.shift();
     }
@@ -282,6 +295,7 @@ function updateCharts(eta, energy, anode, temperature, concentration) {
         metricsChart.data.datasets[0].data = history.eta;
         metricsChart.data.datasets[1].data = history.energy.map(e => e / 1000); // Для масштаба
         metricsChart.data.datasets[2].data = history.anode.map(a => a / 10); // Для масштаба
+        metricsChart.data.datasets[3].data = history.productivity; // ДОБАВЛЕНО: добавление производительности в график
         metricsChart.update();
     }
     
@@ -331,9 +345,16 @@ async function updateSimulation() {
         document.getElementById('eta-value').textContent = `${result.eta}%`;
         document.getElementById('energy-value').textContent = `${result.energy_consumption}`;
         document.getElementById('anode-value').textContent = `${result.anode_consumption}`;
+        document.getElementById('productivity-value').textContent = `${result.productivity}`; // ДОБАВЛЕНО: отображение производительности
         
         // Обновление индикаторов состояния
-        updateStatusIndicators(result.eta, voltage, temperature, concentration);
+        updateStatusIndicators(
+            result.eta, 
+            voltage, 
+            temperature, 
+            concentration,
+            result.productivity // ДОБАВЛЕНО: передача производительности в индикаторы
+        );
         
         // Обработка критических сбоев
         handleCriticalFailure(result.critical_failure, result.warning_message);
@@ -343,6 +364,7 @@ async function updateSimulation() {
             result.eta, 
             result.energy_consumption, 
             result.anode_consumption, 
+            result.productivity, // ДОБАВЛЕНО: передача производительности в графики
             temperature, 
             concentration
         );
@@ -392,20 +414,21 @@ async function saveExperimentHistory() {
     saveButton.textContent = 'Сохранение...';
     
     const payload = {
-    experiment_name: experimentName,
-    experiments: experimentsHistory.map(exp => ({
-        timestamp: exp.timestamp,
-        parameters: exp.parameters,
-        results: {
-            eta: exp.results.eta,
-            energy_consumption: exp.results.energy_consumption,
-            anode_consumption: exp.results.anode_consumption,
-            critical_failure: exp.results.critical_failure,
-            warning_message: exp.results.warning_message,
-            timestamp: exp.timestamp  // Добавляем timestamp внутрь results
-        }
-    }))
-};
+        experiment_name: experimentName,
+        experiments: experimentsHistory.map(exp => ({
+            timestamp: exp.timestamp,
+            parameters: exp.parameters,
+            results: {
+                eta: exp.results.eta,
+                energy_consumption: exp.results.energy_consumption,
+                anode_consumption: exp.results.anode_consumption,
+                productivity: exp.results.productivity, // ДОБАВЛЕНО: сохранение производительности
+                critical_failure: exp.results.critical_failure,
+                warning_message: exp.results.warning_message,
+                timestamp: exp.timestamp  // Добавляем timestamp внутрь results
+            }
+        }))
+    };
     
     const result = await apiRequest('/api/experiments/save', {
         method: 'POST',
@@ -503,6 +526,7 @@ function displayExperimentDetails(experiment) {
                     <th>Выход по току (η)</th>
                     <th>Энергия (кВт·ч/т)</th>
                     <th>Анод (кг/т)</th>
+                    <th>Производительность (т/сут)</th> <!-- ДОБАВЛЕНО: заголовок производительности -->
                     <th>Температура (°C)</th>
                     <th>Глинозём (%)</th>
                 </tr>
@@ -515,12 +539,17 @@ function displayExperimentDetails(experiment) {
         const etaClass = exp.results.eta >= 90 ? 'experiment-eta-good' : 
                         exp.results.eta >= 80 ? 'experiment-eta-warning' : 'experiment-eta-bad';
         
+        // ДОБАВЛЕНО: класс для производительности
+        const prodClass = exp.results.productivity >= 2.5 ? 'experiment-eta-good' : 
+                         exp.results.productivity >= 2.0 ? 'experiment-eta-warning' : 'experiment-eta-bad';
+        
         html += `
             <tr>
                 <td>${date.toLocaleTimeString()}</td>
                 <td class="${etaClass}">${exp.results.eta}%</td>
                 <td>${exp.results.energy_consumption}</td>
                 <td>${exp.results.anode_consumption}</td>
+                <td class="${prodClass}">${exp.results.productivity}</td> <!-- ДОБАВЛЕНО: отображение производительности -->
                 <td>${exp.parameters.temperature}</td>
                 <td>${exp.parameters.concentration}</td>
             </tr>
@@ -551,7 +580,7 @@ async function registerUser(username, password) {
 
 // Функция входа пользователя
 async function loginUser(username, password) {
-    const result = await apiRequest('/token', {
+    const result = await apiRequest('/api/token', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -737,6 +766,18 @@ function initCharts() {
                     data: [],
                     borderColor: '#3182ce',
                     backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                    tension: 0.3,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    fill: true,
+                    yAxisID: 'y1'
+                },
+                // ДОБАВЛЕНО: датасет для производительности
+                {
+                    label: 'Производительность, т/сут',
+                    data: [],
+                    borderColor: '#805ad5',
+                    backgroundColor: 'rgba(128, 90, 213, 0.1)',
                     tension: 0.3,
                     borderWidth: 3,
                     pointRadius: 4,
