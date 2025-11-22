@@ -17,6 +17,17 @@
                 Управляйте параметрами электролизера в реальном времени и наблюдайте за влиянием на эффективность процесса. 
                 Настройте силу тока, напряжение, температуру и концентрацию глинозёма для достижения оптимальных показателей.
             </p>
+            <div class="auth-section">
+                <div id="auth-buttons">
+                    <button id="login-btn" class="auth-button">Войти</button>
+                    <button id="register-btn" class="auth-button">Регистрация</button>
+                </div>
+                <div id="user-info" style="display: none;">
+                    <span id="username-display"></span>
+                    <button id="logout-btn" class="auth-button">Выйти</button>
+                    <button id="experiments-btn" class="auth-button">Мои эксперименты</button>
+                </div>
+            </div>
         </header>
         <div class="main-content">
             <div class="card">
@@ -80,6 +91,14 @@
                         <div class="metric-unit">кг/т Al</div>
                     </div>
                 </div>
+                <div class="save-experiment-section" id="save-experiment-section" style="display: none;">
+                    <h3 class="card-title">📂 Сохранить журнал экспериментов</h3>
+                    <div class="experiment-form">
+                        <input type="text" id="experiment-name" placeholder="Название эксперимента" required>
+                        <button id="save-experiment-btn" class="save-button">Сохранить историю</button>
+                    </div>
+                    <p class="experiment-note">Эта функция сохранит все выполненные эксперименты с момента начала работы</p>
+                </div>
             </div>
             <div class="card">
                 <h2 class="card-title">🧪 Визуализация процесса</h2>
@@ -130,6 +149,66 @@
             <p>Все расчеты основаны на реальных промышленных данных и формулах процесса Холла-Эру</p>
         </div>
     </div>
+    
+    <!-- Модальные окна -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Вход в систему</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-username">Имя пользователя:</label>
+                    <input type="text" id="login-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Пароль:</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button type="submit" class="submit-button">Войти</button>
+                <p class="switch-form">Нет аккаунта? <a href="#" id="switch-to-register">Зарегистрироваться</a></p>
+            </form>
+        </div>
+    </div>
+    
+    <div class="modal" id="register-modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Регистрация</h2>
+            <form id="register-form">
+                <div class="form-group">
+                    <label for="register-username">Имя пользователя:</label>
+                    <input type="text" id="register-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Пароль:</label>
+                    <input type="password" id="register-password" required>
+                </div>
+                <button type="submit" class="submit-button">Зарегистрироваться</button>
+                <p class="switch-form">Уже есть аккаунт? <a href="#" id="switch-to-login">Войти</a></p>
+            </form>
+        </div>
+    </div>
+    
+    <div class="modal" id="experiments-modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Мои эксперименты</h2>
+            <div id="experiments-list">
+                <p class="no-experiments">У вас пока нет сохраненных экспериментов.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="experiment-details-modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="experiment-details-title">Детали эксперимента</h2>
+            <div id="experiment-details-content">
+                <!-- Динамически заполняется -->
+            </div>
+        </div>
+    </div>
+    
     <div class="warning-message warning-danger" id="danger-warning">Опасность короткого замыкания!</div>
     <div class="warning-message warning-warning" id="warning-warning">Внимание: отклонение от оптимальных параметров</div>
     

@@ -10,28 +10,61 @@ const history = {
     concentration: []
 };
 
-// Функция для выполнения запроса к API
-async function simulateProcess(params) {
+// Журнал экспериментов для сохранения
+const experimentsHistory = [];
+
+// Токен аутентификации
+let authToken = localStorage.getItem('authToken') || null;
+let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+
+// Функция для выполнения запроса к API с обработкой ошибок
+async function apiRequest(url, options = {}) {
     try {
-        const response = await fetch('/api/simulate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(params)
-        });
+        // Добавляем токен в заголовки, если он есть
+        if (authToken) {
+            options.headers = options.headers || {};
+            options.headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        
+        const response = await fetch(url, options);
+        
+        // Обработка ошибок авторизации
+        if (response.status === 401) {
+            // Токен недействителен, очищаем данные
+            authToken = null;
+            currentUser = null;
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            document.getElementById('auth-buttons').style.display = 'block';
+            document.getElementById('user-info').style.display = 'none';
+            showWarning('warning', 'Сессия истекла. Пожалуйста, войдите снова.');
+            return null;
+        }
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Ошибка расчета');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `Ошибка ${response.status}`);
         }
         
         return await response.json();
     } catch (error) {
-        console.error('Ошибка при расчете:', error);
+        console.error(`Ошибка при запросе к ${url}:`, error);
         showWarning('danger', `Ошибка сервера: ${error.message}`);
         return null;
     }
+}
+
+// Функция для выполнения запроса к API для симуляции
+async function simulateProcess(params) {
+    const options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params)
+    };
+    
+    return await apiRequest('/api/simulate', options);
 }
 
 // Функция обновления состояния индикаторов
@@ -180,15 +213,13 @@ function createIon(type) {
         ion.style.left = `${left - rect.left}px`;
         ion.style.top = `${top - rect.top}px`;
         ion.style.animation = `move-ion 6s infinite linear`;
-        ion.style.animationDirection = 'normal';
     } else {
         // Ионы кислорода движутся к аноду (вверх)
         const left = rect.left + 50 + Math.random() * (rect.width - 100);
         const top = rect.top + 200 + Math.random() * 150;
         ion.style.left = `${left - rect.left}px`;
         ion.style.top = `${top - rect.top}px`;
-        ion.style.animation = `move-ion 4s infinite linear`;
-        ion.style.animationDirection = 'reverse';
+        ion.style.animation = `move-ion 4s infinite linear reverse`;
     }
     
     electrolyzer.appendChild(ion);
@@ -317,6 +348,19 @@ async function updateSimulation() {
             concentration
         );
         
+        // Сохраняем эксперимент в историю для возможного сохранения
+        const experimentLog = {
+            timestamp: new Date().toISOString(),
+            parameters: {
+                current: current,
+                voltage: voltage,
+                temperature: temperature,
+                concentration: concentration
+            },
+            results: result
+        };
+        experimentsHistory.push(experimentLog);
+        
         // Вызов предупреждения при отклонении от оптимума
         if (result.warning_message && !result.critical_failure && voltage >= 4.0) {
             showWarning('warning', result.warning_message);
@@ -324,6 +368,339 @@ async function updateSimulation() {
             showWarning('warning', 'Параметры отклонены от оптимальных значений');
         }
     }
+}
+
+// Функция сохранения журнала экспериментов
+async function saveExperimentHistory() {
+    if (!authToken) {
+        showWarning('warning', 'Для сохранения экспериментов необходимо войти в систему');
+        return;
+    }
+    
+    const experimentName = document.getElementById('experiment-name').value.trim();
+    if (!experimentName) {
+        showWarning('warning', 'Пожалуйста, введите название эксперимента');
+        return;
+    }
+    
+    if (experimentsHistory.length === 0) {
+        showWarning('warning', 'Нет экспериментов для сохранения');
+        return;
+    }
+    
+    const saveButton = document.getElementById('save-experiment-btn');
+    saveButton.disabled = true;
+    saveButton.textContent = 'Сохранение...';
+    
+    const payload = {
+        experiment_name: experimentName,
+        experiments: experimentsHistory.map(exp => ({
+            timestamp: exp.timestamp,
+            parameters: exp.parameters,
+            results: {
+                eta: exp.results.eta,
+                energy_consumption: exp.results.energy_consumption,
+                anode_consumption: exp.results.anode_consumption,
+                critical_failure: exp.results.critical_failure,
+                warning_message: exp.results.warning_message
+            }
+        }))
+    };
+    
+    const result = await apiRequest('/api/experiments/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+    });
+    
+    saveButton.disabled = false;
+    saveButton.textContent = 'Сохранить историю';
+    
+    if (result && result.success) {
+        showWarning('warning', 'История экспериментов успешно сохранена!');
+        // Очищаем историю после сохранения
+        experimentsHistory.length = 0;
+    }
+}
+
+// Функция загрузки списка экспериментов пользователя
+async function loadUserExperiments() {
+    if (!authToken) {
+        showWarning('warning', 'Для просмотра экспериментов необходимо войти в систему');
+        return;
+    }
+    
+    const result = await apiRequest('/api/experiments');
+    
+    if (result) {
+        displayExperimentsList(result.experiment_histories);
+    }
+}
+
+// Функция отображения списка экспериментов
+function displayExperimentsList(experiments) {
+    const experimentsList = document.getElementById('experiments-list');
+    
+    if (experiments.length === 0) {
+        experimentsList.innerHTML = '<p class="no-experiments">У вас пока нет сохраненных экспериментов.</p>';
+        return;
+    }
+    
+    let html = '';
+    experiments.forEach(exp => {
+        const date = new Date(exp.created_at);
+        html += `
+            <div class="experiment-item" data-id="${exp.id}">
+                <div class="experiment-name">${exp.experiment_name}</div>
+                <div class="experiment-date">Создан: ${date.toLocaleDateString()} в ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+            </div>
+        `;
+    });
+    
+    experimentsList.innerHTML = html;
+    
+    // Добавляем обработчики кликов по экспериментам
+    document.querySelectorAll('.experiment-item').forEach(item => {
+        item.addEventListener('click', async () => {
+            const experimentId = item.getAttribute('data-id');
+            await loadExperimentDetails(experimentId);
+        });
+    });
+}
+
+// Функция загрузки деталей эксперимента
+async function loadExperimentDetails(experimentId) {
+    const result = await apiRequest(`/api/experiments/${experimentId}`);
+    
+    if (result) {
+        displayExperimentDetails(result);
+    }
+}
+
+// Функция отображения деталей эксперимента
+function displayExperimentDetails(experiment) {
+    const modal = document.getElementById('experiment-details-modal');
+    const title = document.getElementById('experiment-details-title');
+    const content = document.getElementById('experiment-details-content');
+    
+    title.textContent = experiment.experiment_name;
+    
+    // Формируем содержимое
+    let html = `
+        <div class="experiment-summary">
+            <h3>Общая информация</h3>
+            <p><strong>Количество экспериментов:</strong> ${experiment.experiments.length}</p>
+            <p><strong>Первый эксперимент:</strong> ${new Date(experiment.experiments[0].timestamp).toLocaleString()}</p>
+            <p><strong>Последний эксперимент:</strong> ${new Date(experiment.experiments[experiment.experiments.length-1].timestamp).toLocaleString()}</p>
+        </div>
+        
+        <table class="experiment-table">
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Выход по току (η)</th>
+                    <th>Энергия (кВт·ч/т)</th>
+                    <th>Анод (кг/т)</th>
+                    <th>Температура (°C)</th>
+                    <th>Глинозём (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    experiment.experiments.forEach(exp => {
+        const date = new Date(exp.timestamp);
+        const etaClass = exp.results.eta >= 90 ? 'experiment-eta-good' : 
+                        exp.results.eta >= 80 ? 'experiment-eta-warning' : 'experiment-eta-bad';
+        
+        html += `
+            <tr>
+                <td>${date.toLocaleTimeString()}</td>
+                <td class="${etaClass}">${exp.results.eta}%</td>
+                <td>${exp.results.energy_consumption}</td>
+                <td>${exp.results.anode_consumption}</td>
+                <td>${exp.parameters.temperature}</td>
+                <td>${exp.parameters.concentration}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+            </tbody>
+        </table>
+    `;
+    
+    content.innerHTML = html;
+    modal.style.display = 'flex';
+}
+
+// Функция регистрации пользователя
+async function registerUser(username, password) {
+    const result = await apiRequest('/register', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password })
+    });
+    
+    return result;
+}
+
+// Функция входа пользователя
+async function loginUser(username, password) {
+    const result = await apiRequest('/token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            'username': username,
+            'password': password,
+            'grant_type': 'password'
+        })
+    });
+    
+    return result;
+}
+
+// Функция выхода пользователя
+function logoutUser() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    document.getElementById('auth-buttons').style.display = 'block';
+    document.getElementById('user-info').style.display = 'none';
+    document.getElementById('save-experiment-section').style.display = 'none';
+    showWarning('warning', 'Вы успешно вышли из системы');
+}
+
+// Функция инициализации аутентификации
+function initAuth() {
+    // Проверяем, есть ли сохраненный токен
+    if (authToken && currentUser) {
+        document.getElementById('auth-buttons').style.display = 'none';
+        document.getElementById('user-info').style.display = 'flex';
+        document.getElementById('username-display').textContent = currentUser.username;
+        
+        // Показываем раздел сохранения экспериментов для авторизованных пользователей
+        document.getElementById('save-experiment-section').style.display = 'block';
+        
+        // Загружаем список экспериментов
+        loadUserExperiments();
+    }
+    
+    // Обработчики для кнопок аутентификации
+    document.getElementById('login-btn').addEventListener('click', () => {
+        document.getElementById('login-modal').style.display = 'flex';
+    });
+    
+    document.getElementById('register-btn').addEventListener('click', () => {
+        document.getElementById('register-modal').style.display = 'flex';
+    });
+    
+    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+    
+    document.getElementById('experiments-btn').addEventListener('click', () => {
+        if (authToken) {
+            loadUserExperiments();
+            document.getElementById('experiments-modal').style.display = 'flex';
+        } else {
+            showWarning('warning', 'Для просмотра экспериментов необходимо войти в систему');
+        }
+    });
+    
+    // Обработчики для модальных окон
+    document.querySelectorAll('.close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', function() {
+            this.parentElement.parentElement.style.display = 'none';
+        });
+    });
+    
+    // Закрытие модального окна при клике вне его
+    window.addEventListener('click', function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    });
+    
+    // Обработчик формы регистрации
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('register-username').value;
+        const password = document.getElementById('register-password').value;
+        
+        const result = await registerUser(username, password);
+        
+        if (result && result.access_token) {
+            // Сохраняем токен и информацию о пользователе
+            authToken = result.access_token;
+            currentUser = { username };
+            localStorage.setItem('authToken', authToken);
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Закрываем модальное окно
+            document.getElementById('register-modal').style.display = 'none';
+            
+            // Обновляем интерфейс
+            document.getElementById('auth-buttons').style.display = 'none';
+            document.getElementById('user-info').style.display = 'flex';
+            document.getElementById('username-display').textContent = username;
+            document.getElementById('save-experiment-section').style.display = 'block';
+            
+            showWarning('warning', 'Регистрация успешна! Добро пожаловать!');
+        }
+    });
+    
+    // Обработчик формы входа
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value;
+        const password = document.getElementById('login-password').value;
+        
+        const result = await loginUser(username, password);
+        
+        if (result && result.access_token) {
+            // Сохраняем токен и информацию о пользователе
+            authToken = result.access_token;
+            currentUser = { username };
+            localStorage.setItem('authToken', authToken);
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Закрываем модальное окно
+            document.getElementById('login-modal').style.display = 'none';
+            
+            // Обновляем интерфейс
+            document.getElementById('auth-buttons').style.display = 'none';
+            document.getElementById('user-info').style.display = 'flex';
+            document.getElementById('username-display').textContent = username;
+            document.getElementById('save-experiment-section').style.display = 'block';
+            
+            showWarning('warning', 'Вход успешен! Добро пожаловать!');
+            
+            // Загружаем список экспериментов
+            loadUserExperiments();
+        }
+    });
+    
+    // Переключение между формами
+    document.getElementById('switch-to-register').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('login-modal').style.display = 'none';
+        document.getElementById('register-modal').style.display = 'flex';
+    });
+    
+    document.getElementById('switch-to-login').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('register-modal').style.display = 'none';
+        document.getElementById('login-modal').style.display = 'flex';
+    });
+    
+    // Обработчик кнопки сохранения эксперимента
+    document.getElementById('save-experiment-btn').addEventListener('click', saveExperimentHistory);
 }
 
 // Инициализация графиков
@@ -519,6 +896,9 @@ function initCharts() {
 
 // Инициализация симулятора
 function initSimulator() {
+    // Инициализация аутентификации
+    initAuth();
+    
     // Инициализация графиков
     initCharts();
     
@@ -554,10 +934,10 @@ function initSimulator() {
             createBubble();
         }
     }, 300);
+    
+    // Периодическое обновление данных
+    setInterval(updateSimulation, 1000);
 }
 
 // Запуск симулятора при загрузке страницы
 document.addEventListener('DOMContentLoaded', initSimulator);
-
-// Периодическое обновление данных
-setInterval(updateSimulation, 1000);
