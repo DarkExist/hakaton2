@@ -25,7 +25,6 @@ async function apiRequest(url, options = {}) {
             options.headers = options.headers || {};
             options.headers['Authorization'] = `Bearer ${authToken}`;
         }
-        
         const response = await fetch(url, options);
         
         // Обработка ошибок авторизации
@@ -539,7 +538,7 @@ function displayExperimentDetails(experiment) {
 
 // Функция регистрации пользователя
 async function registerUser(username, password) {
-    const result = await apiRequest('/register', {
+    const result = await apiRequest('/api/register', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
